@@ -1,0 +1,18 @@
+-- Add new fields to the properties table for the Elite One import
+
+ALTER TABLE properties
+ADD COLUMN IF NOT EXISTS "propertyCode" VARCHAR(255) UNIQUE,
+ADD COLUMN IF NOT EXISTS "projectName" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "unitNumber" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "apartmentNumber" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "floor" VARCHAR(255),
+ADD COLUMN IF NOT EXISTS "ratePerSqFt" FLOAT,
+ADD COLUMN IF NOT EXISTS "totalPrice" FLOAT,
+ADD COLUMN IF NOT EXISTS "downPaymentPercentage" FLOAT,
+ADD COLUMN IF NOT EXISTS "downPaymentAmount" FLOAT,
+ADD COLUMN IF NOT EXISTS "remainingAmount" FLOAT,
+ADD COLUMN IF NOT EXISTS "installmentMonths" INTEGER,
+ADD COLUMN IF NOT EXISTS "monthlyInstallment" FLOAT,
+ADD COLUMN IF NOT EXISTS "possessionPercentage" FLOAT,
+ADD COLUMN IF NOT EXISTS "possessionAmount" FLOAT,
+ADD COLUMN IF NOT EXISTS "imageUrl" VARCHAR(255);

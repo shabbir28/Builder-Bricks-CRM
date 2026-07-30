@@ -1,0 +1,94 @@
+node : C:\Users\shab
+b\OneDrive\Desktop\C
+RM\backend\node_modu
+les\mongoose\lib\dri
+vers\node-mongodb-na
+tive\connection.js:2
+30
+At line:1 char:1
++ node 
+test-deals.js > 
+error.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo  
+            : NotS  
+  pecified: (C:\U   
+ sers\shabb\...n    
+nection.js:230:    
+String) [], Rem    
+oteException
+    + FullyQualifie 
+   dErrorId : Nati  
+  veCommandError
+ 
+    throw new 
+MongooseError('The 
+`uri` parameter to 
+`openUri()` must be 
+a ' +
+          ^
+
+MongooseError: The 
+`uri` parameter to 
+`openUri()` must be 
+a string, got 
+"undefined". Make 
+sure the first 
+parameter to `mongoo
+se.connect()` or `mo
+ngoose.createConnect
+ion()` is a string.
+    at NativeConnect
+ion.createClient (C:
+\Users\shabb\OneDriv
+e\Desktop\CRM\backen
+d\node_modules\mongo
+ose\lib\drivers\node
+-mongodb-native\conn
+ection.js:230:11)
+    at NativeConnect
+ion.openUri (C:\User
+s\shabb\OneDrive\Des
+ktop\CRM\backend\nod
+e_modules\mongoose\l
+ib\connection.js:107
+5:34)
+    at 
+Mongoose.connect (C:
+\Users\shabb\OneDriv
+e\Desktop\CRM\backen
+d\node_modules\mongo
+ose\lib\mongoose.js:
+471:15)
+    at 
+Object.<anonymous> (
+C:\Users\shabb\OneDr
+ive\Desktop\CRM\back
+end\test-deals.js:10
+:10)
+    at 
+Module._compile (nod
+e:internal/modules/c
+js/loader:1730:14)
+    at Object..js (n
+ode:internal/modules
+/cjs/loader:1895:10)
+    at Module.load (
+node:internal/module
+s/cjs/loader:1465:32
+)
+    at 
+Function._load (node
+:internal/modules/cj
+s/loader:1282:12)
+    at TracingChanne
+l.traceSync (node:di
+agnostics_channel:32
+2:14)
+    at 
+wrapModuleLoad (node
+:internal/modules/cj
+s/loader:235:24)
+
+Node.js v22.17.1

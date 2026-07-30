@@ -1,0 +1,14 @@
+Starting debug seed...
+Connecting to: mongodb+srv://shabbi...
+Connected!
+Deleting users...
+Deleted.
+Creating admin...
+User object initialized.
+ERROR: next is not a function
+STACK: TypeError: next is not a function
+    at model.<anonymous> (C:\Users\shabb\OneDrive\Desktop\CRM\backend\src\models\User.js:64:5)
+    at async Kareem.execPre (C:\Users\shabb\OneDrive\Desktop\CRM\backend\node_modules\kareem\index.js:70:24)
+    at async model.$__save (C:\Users\shabb\OneDrive\Desktop\CRM\backend\node_modules\mongoose\lib\model.js:376:5)
+    at async model.save (C:\Users\shabb\OneDrive\Desktop\CRM\backend\node_modules\mongoose\lib\model.js:642:5)
+    at async debugSeed (C:\Users\shabb\OneDrive\Desktop\CRM\backend\debug_user_create.js:38:5)

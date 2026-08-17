@@ -173,7 +173,14 @@ const ImportExcelModal = ({ isOpen, onClose, onSuccess }) => {
                           <td className="p-3 text-sm text-ink-secondary">{p.area} sqft</td>
                           <td className="p-3 text-sm text-ink-primary font-bold">Rs. {(p.totalPrice / 1e6).toFixed(2)}M</td>
                           <td className="p-3 text-sm">
-                            <span className="flex items-center gap-1 text-emerald-400 text-xs font-bold"><CheckCircleIcon className="w-4 h-4"/> Ready</span>
+                            {p.status === 'sold' ? (
+                              <div className="flex flex-col">
+                                <span className="flex items-center gap-1 text-rose-400 text-xs font-bold">Sold</span>
+                                {p.ownerName && <span className="text-[10px] text-ink-tertiary mt-0.5">{p.ownerName}</span>}
+                              </div>
+                            ) : (
+                              <span className="flex items-center gap-1 text-emerald-400 text-xs font-bold"><CheckCircleIcon className="w-4 h-4"/> Available</span>
+                            )}
                           </td>
                         </tr>
                       ))}

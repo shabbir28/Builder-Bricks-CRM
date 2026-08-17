@@ -329,15 +329,13 @@ const Properties = () => {
           </div>
 
           {/* Import Excel */}
-          {user?.role === 'admin' && (
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="btn flex items-center gap-2"
-              style={{ background: 'rgba(16,185,129,0.18)', borderColor: 'rgba(16,185,129,0.45)', color: '#34d399', fontWeight: 700 }}
-            >
-              <ArrowUpTrayIcon className="w-4 h-4" /> Import Excel
-            </button>
-          )}
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="btn flex items-center gap-2"
+            style={{ background: 'rgba(16,185,129,0.18)', borderColor: 'rgba(16,185,129,0.45)', color: '#34d399', fontWeight: 700 }}
+          >
+            <ArrowUpTrayIcon className="w-4 h-4" /> Import Excel
+          </button>
 
           {/* Download CSV */}
           <button

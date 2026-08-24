@@ -446,6 +446,7 @@ const Properties = () => {
                   <th className="px-4 py-4 text-[11px] font-bold text-ink-tertiary uppercase tracking-wider">Remaining</th>
                   <th className="px-4 py-4 text-[11px] font-bold text-ink-tertiary uppercase tracking-wider">24 Monthly Inst.</th>
                   <th className="px-4 py-4 text-[11px] font-bold text-ink-tertiary uppercase tracking-wider">20% Possession</th>
+                  <th className="px-4 py-4 text-[11px] font-bold text-ink-tertiary uppercase tracking-wider">Owner</th>
                   <th className="px-4 py-4 text-[11px] font-bold text-ink-tertiary uppercase tracking-wider">Status</th>
                   <th className="px-4 py-4 text-[11px] font-bold text-ink-tertiary uppercase tracking-wider text-right">Actions</th>
                 </tr>
@@ -482,6 +483,9 @@ const Properties = () => {
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-ink-primary">
                       {p.possessionAmount ? `Rs. ${Number(p.possessionAmount).toLocaleString()}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                      {p.client ? p.client.name : p.ownerName ? p.ownerName : '-'}
                     </td>
                     <td className="px-4 py-3">
                       {(() => {
@@ -646,10 +650,10 @@ const Properties = () => {
                         className="h-6 w-6 rounded-lg flex items-center justify-center text-[9px] font-bold"
                         style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}
                       >
-                        {p.client?.name?.[0]?.toUpperCase() || '?'}
+                        {p.client?.name?.[0]?.toUpperCase() || p.ownerName?.[0]?.toUpperCase() || '?'}
                       </div>
                       <span className="text-xs text-ink-tertiary">
-                        {p.client ? `Sold to: ${p.client.name}` : 'Unassigned'}
+                        {p.client ? `Sold to: ${p.client.name}` : p.ownerName ? `Sold to: ${p.ownerName}` : 'Unassigned'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-ink-tertiary">

@@ -111,6 +111,10 @@ const Property = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    ownerName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     // Elite One Import Fields
     propertyCode: {
       type: DataTypes.STRING,

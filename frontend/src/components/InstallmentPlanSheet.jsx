@@ -190,7 +190,34 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
                     <>
                       <td className="py-1.5 px-1"><input type="number" placeholder="0" className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-right text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.surcharges} onChange={e => setEditForm({...editForm, surcharges: e.target.value})} /></td>
                       <td className="py-1.5 px-1"><input type="number" placeholder="0" className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-right text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.adjustment} onChange={e => setEditForm({...editForm, adjustment: e.target.value})} /></td>
-                      <td className="py-1.5 px-1"><input type="number" placeholder="0" className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-right text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.payment} onChange={e => setEditForm({...editForm, payment: e.target.value})} /></td>
+                      <td className="py-1.5 px-1">
+                        <div className="flex flex-col gap-1">
+                          <select 
+                            className="bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-1 py-1 text-[10px] text-white focus:outline-none"
+                            value={editForm.paymentType || 'custom'}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === 'full') {
+                                const fullAmount = downPayment + (row.isPossession ? possessionPayment : installment);
+                                setEditForm({...editForm, paymentType: 'full', payment: fullAmount});
+                              } else {
+                                setEditForm({...editForm, paymentType: 'custom', payment: ''});
+                              }
+                            }}
+                          >
+                            <option value="custom" style={{ background: '#0e1015' }}>Custom</option>
+                            <option value="full" style={{ background: '#0e1015' }}>Full Installment</option>
+                          </select>
+                          <input 
+                            type="number" 
+                            placeholder="0" 
+                            className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-right text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" 
+                            value={editForm.payment} 
+                            readOnly={editForm.paymentType === 'full'}
+                            onChange={e => setEditForm({...editForm, payment: e.target.value})} 
+                          />
+                        </div>
+                      </td>
                       <td className="py-1.5 px-1"><input type="date" className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-center text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.paidDate} onChange={e => setEditForm({...editForm, paidDate: e.target.value})} /></td>
                       <td className="py-1.5 px-1"><input type="text" placeholder="Ref #" className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-center text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.transactionRef} onChange={e => setEditForm({...editForm, transactionRef: e.target.value})} /></td>
                     </>

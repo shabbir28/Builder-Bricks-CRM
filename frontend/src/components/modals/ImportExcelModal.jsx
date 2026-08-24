@@ -3,7 +3,7 @@ import axios from 'axios';
 import { XMarkIcon, ArrowUpTrayIcon, DocumentTextIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
-const ImportExcelModal = ({ isOpen, onClose, onSuccess }) => {
+const ImportExcelModal = ({ isOpen, onClose, onImportSuccess }) => {
   const [file, setFile] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [stats, setStats] = useState(null);
@@ -66,7 +66,7 @@ const ImportExcelModal = ({ isOpen, onClose, onSuccess }) => {
         if (res.data.errorCount > 0) {
           toast.error(`${res.data.errorCount} properties failed to import.`);
         }
-        onSuccess();
+        if (onImportSuccess) onImportSuccess();
         handleClose();
       }
     } catch (err) {

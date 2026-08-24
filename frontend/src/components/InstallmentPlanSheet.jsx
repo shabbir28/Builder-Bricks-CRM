@@ -24,11 +24,14 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
   const handleEdit = (row) => {
     setEditingId(row.id);
     setEditForm({
+      downPayment: row.downPayment || 0,
+      installment: row.installment || 0,
       surcharges: row.surcharges || '',
       adjustment: row.adjustment || '',
       transactionRef: row.transactionRef || '',
       paidDate: row.paidDate ? new Date(row.paidDate).toISOString().split('T')[0] : '',
-      payment: row.payment || ''
+      payment: row.payment || '',
+      remarks: row.remarks || ''
     });
   };
 
@@ -41,11 +44,14 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
     try {
       setLoading(true);
       const res = await axios.put(`/api/clients/${client.id}/installments/${installmentId}`, {
+        downPayment: editForm.downPayment || 0,
+        installment: editForm.installment || 0,
         surcharges: editForm.surcharges || 0,
         adjustment: editForm.adjustment || 0,
         transactionRef: editForm.transactionRef,
         paidDate: editForm.paidDate,
-        payment: editForm.payment || 0
+        payment: editForm.payment || 0,
+        remarks: editForm.remarks || ''
       });
 
       if (res.data.success) {
@@ -77,6 +83,10 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
 
   // Initialize remaining property balance
   let propertyBalance = parseFloat(String(client.netPrice || client.totalPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+  
+  // Track total downpayment required and payments made
+  const totalRequiredDP = parseFloat(String(client.downPayment || '0').replace(/[^0-9.]/g, '')) || 0;
+  let accumulatedPaymentsForDP = 0;
 
   const handleUploadReceipt = async (installmentId, file) => {
     if (!file) return;
@@ -98,6 +108,21 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
       }
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to upload receipt');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMonth = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.post(`/api/clients/${client.id}/installments`);
+      if (res.data.success) {
+        toast.success('Extra month added successfully!');
+        if (onUpdate) onUpdate(res.data.data);
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to add extra month');
     } finally {
       setLoading(false);
     }
@@ -148,6 +173,7 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
               <th className="py-3 px-2 text-[10px] font-black text-ink-tertiary uppercase tracking-wider text-center whitespace-nowrap">Transaction Ref</th>
               <th className="py-3 px-2 text-[10px] font-black text-ink-tertiary uppercase tracking-wider text-right whitespace-nowrap text-white">Due Amount</th>
               <th className="py-3 px-2 text-[10px] font-black text-ink-tertiary uppercase tracking-wider text-right whitespace-nowrap">Balance</th>
+              <th className="py-3 px-2 text-[10px] font-black text-ink-tertiary uppercase tracking-wider whitespace-nowrap text-left">Remarks</th>
               <th className="py-3 px-3 text-[10px] font-black text-ink-tertiary uppercase tracking-wider text-center whitespace-nowrap bg-[#0a0f18]/90 backdrop-blur-sm border-l border-surface-border/50">Actions</th>
             </tr>
           </thead>
@@ -155,16 +181,25 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
             {schedule.map((row) => {
               const isEditing = editingId === row.id;
 
+              const isDpPaid = accumulatedPaymentsForDP >= totalRequiredDP;
+
               const downPayment = parseFloat(row.downPayment) || 0;
-              const installment = parseFloat(row.installment) || 0;
+              let installment = parseFloat(row.installment) || 0;
               const possessionPayment = parseFloat(row.possessionPayment) || 0;
               const surcharges = isEditing ? parseFloat(editForm.surcharges) || 0 : parseFloat(row.surcharges) || 0;
               const adjustment = isEditing ? parseFloat(editForm.adjustment) || 0 : parseFloat(row.adjustment) || 0;
               const payment = isEditing ? parseFloat(editForm.payment) || 0 : parseFloat(row.payment) || 0;
 
+              // Dynamically hide installment if downpayment isn't fully paid yet
+              if (!isDpPaid && !row.isPossession) {
+                installment = 0;
+              }
+
               const dueAmount = downPayment + installment + possessionPayment + surcharges - adjustment;
               currentBalance = currentBalance + dueAmount - payment;
               propertyBalance = propertyBalance - payment;
+
+              accumulatedPaymentsForDP += payment;
 
               sumDownPayment += downPayment;
               sumInstallments += installment;
@@ -183,8 +218,17 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
                   <td className="py-2.5 px-3 text-[12px] font-bold text-white whitespace-nowrap border-r border-surface-border/20">
                     {row.isPossession ? <span className="text-emerald-400">Possession</span> : row.monthDate ? format(new Date(row.monthDate), 'MMM yyyy') : '-'}
                   </td>
-                  <td className="py-2.5 px-2 text-right text-[12px] font-medium text-ink-secondary">{formatNum(downPayment)}</td>
-                  <td className="py-2.5 px-2 text-right text-[12px] font-medium text-ink-secondary">{formatNum(row.isPossession ? possessionPayment : installment)}</td>
+                  {isEditing ? (
+                    <>
+                      <td className="py-1.5 px-1"><input type="number" placeholder="0" className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-right text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.downPayment} onChange={e => setEditForm({...editForm, downPayment: e.target.value})} disabled={row.isPossession} /></td>
+                      <td className="py-1.5 px-1"><input type="number" placeholder="0" className={`w-full bg-[#0f1520]/80 border ${!isDpPaid ? 'border-red-500/30 opacity-50' : 'border-orange-500/30'} rounded-lg px-2 py-1 text-right text-[12px] font-bold text-white focus:outline-none focus:border-orange-500 transition-all`} value={!isDpPaid ? 0 : editForm.installment} onChange={e => setEditForm({...editForm, installment: e.target.value})} disabled={row.isPossession || !isDpPaid} title={!isDpPaid ? "Pay downpayment first" : ""} /></td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="py-2.5 px-2 text-right text-[12px] font-medium text-ink-secondary">{formatNum(downPayment)}</td>
+                      <td className="py-2.5 px-2 text-right text-[12px] font-medium text-ink-secondary">{formatNum(row.isPossession ? possessionPayment : installment)}</td>
+                    </>
+                  )}
                   
                   {isEditing ? (
                     <>
@@ -239,6 +283,12 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
                   <td className="py-2.5 px-2 text-right text-[12px] font-black text-white/90">
                     {formatNum(propertyBalance)}
                   </td>
+                  
+                  {isEditing ? (
+                    <td className="py-1.5 px-1"><input type="text" placeholder="Remarks..." className="w-full bg-[#0f1520]/80 border border-orange-500/30 rounded-lg px-2 py-1 text-left text-[11px] font-medium text-white focus:outline-none focus:border-orange-500 transition-all" value={editForm.remarks} onChange={e => setEditForm({...editForm, remarks: e.target.value})} /></td>
+                  ) : (
+                    <td className="py-2.5 px-2 text-[11px] font-medium text-ink-secondary max-w-[120px] truncate" title={row.remarks || ''}>{row.remarks || '-'}</td>
+                  )}
 
                   <td className="py-2.5 px-3 text-center bg-[#0a0f18]/90 group-hover:bg-[#131b28]/90 backdrop-blur-sm border-l border-surface-border/50 transition-colors">
                     {isEditing ? (
@@ -310,7 +360,7 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
             })}
             {schedule.length === 0 && (
               <tr>
-                <td colSpan="11" className="py-16 text-center">
+                <td colSpan="12" className="py-16 text-center">
                   <div className="inline-flex flex-col items-center justify-center">
                     <div className="w-16 h-16 rounded-full bg-surface-raised/50 flex items-center justify-center mb-4">
                       <DocumentArrowDownIcon className="w-8 h-8 text-ink-tertiary" />
@@ -325,7 +375,7 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
           {schedule.length > 0 && (
             <tfoot className="bg-[#0f1520] relative z-10">
               <tr>
-                <td colSpan="11" className="p-0 border-t-2 border-surface-border/80">
+                <td colSpan="12" className="p-0 border-t-2 border-surface-border/80">
                   <div className="flex flex-wrap items-center justify-between p-6 gap-6">
                     
                     <div className="flex items-center gap-8">
@@ -344,15 +394,34 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
                       </div>
                     </div>
 
-                    <div className="bg-surface-base border border-surface-border rounded-2xl px-6 py-4 flex items-center gap-6 shadow-xl">
-                      <div>
-                        <div className="text-[10px] font-black text-ink-tertiary uppercase tracking-[0.2em] mb-1 text-right">Remaining Balance</div>
-                        <div className="text-3xl font-black tracking-tight text-white">
-                          <span className="text-base font-bold opacity-50 mr-1.5">Rs.</span>{formatNum(propertyBalance)}
+                    <div className="flex items-center gap-4">
+                      {executive && (
+                        <button
+                          onClick={handleAddMonth}
+                          disabled={loading}
+                          className="px-4 py-2 bg-surface-raised border border-surface-border rounded-xl text-xs font-bold text-white hover:bg-surface-raised/80 transition-colors"
+                        >
+                          + Add Extra Month
+                        </button>
+                      )}
+                      {!executive && canDirectEdit && (
+                        <button
+                          onClick={handleAddMonth}
+                          disabled={loading}
+                          className="px-4 py-2 bg-surface-raised border border-surface-border rounded-xl text-xs font-bold text-white hover:bg-surface-raised/80 transition-colors"
+                        >
+                          + Add Extra Month
+                        </button>
+                      )}
+                      <div className="bg-surface-base border border-surface-border rounded-2xl px-6 py-4 flex items-center gap-6 shadow-xl">
+                        <div>
+                          <div className="text-[10px] font-black text-ink-tertiary uppercase tracking-[0.2em] mb-1 text-right">Remaining Balance</div>
+                          <div className="text-3xl font-black tracking-tight text-white">
+                            <span className="text-base font-bold opacity-50 mr-1.5">Rs.</span>{formatNum(propertyBalance)}
+                          </div>
                         </div>
                       </div>
                     </div>
-
                   </div>
                 </td>
               </tr>

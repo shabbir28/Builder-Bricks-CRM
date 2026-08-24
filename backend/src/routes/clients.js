@@ -205,6 +205,9 @@ router.put("/:id/installments/:installmentId", auth, async (req, res) => {
         transactionRef: req.body.transactionRef !== undefined ? req.body.transactionRef : originalRow.transactionRef,
         paidDate: req.body.paidDate !== undefined ? req.body.paidDate : originalRow.paidDate,
         payment: parseFloat(req.body.payment ?? originalRow.payment ?? 0),
+        remarks: req.body.remarks !== undefined ? req.body.remarks : originalRow.remarks,
+        downPayment: req.body.downPayment !== undefined ? parseFloat(req.body.downPayment) : originalRow.downPayment,
+        installment: req.body.installment !== undefined ? parseFloat(req.body.installment) : originalRow.installment,
       };
 
       client.set("installmentSchedule", schedule);
@@ -221,6 +224,9 @@ router.put("/:id/installments/:installmentId", auth, async (req, res) => {
       transactionRef: req.body.transactionRef !== undefined ? req.body.transactionRef : originalRow.transactionRef,
       paidDate: req.body.paidDate !== undefined ? req.body.paidDate : originalRow.paidDate,
       payment: parseFloat(req.body.payment ?? originalRow.payment ?? 0),
+      remarks: req.body.remarks !== undefined ? req.body.remarks : originalRow.remarks,
+      downPayment: req.body.downPayment !== undefined ? parseFloat(req.body.downPayment) : originalRow.downPayment,
+      installment: req.body.installment !== undefined ? parseFloat(req.body.installment) : originalRow.installment,
     };
 
     const installmentRequest = await InstallmentRequest.create({
@@ -234,6 +240,9 @@ router.put("/:id/installments/:installmentId", auth, async (req, res) => {
         transactionRef: originalRow.transactionRef,
         paidDate: originalRow.paidDate,
         payment: originalRow.payment,
+        remarks: originalRow.remarks,
+        downPayment: originalRow.downPayment,
+        installment: originalRow.installment,
       },
       status: "pending",
     });
@@ -246,6 +255,66 @@ router.put("/:id/installments/:installmentId", auth, async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+// @desc    Add an extra month to schedule
+// @route   POST /api/clients/:id/installments
+router.post("/:id/installments", auth, async (req, res) => {
+  try {
+    const client = await Client.findByPk(req.params.id);
+    if (!client) return res.status(404).json({ success: false, message: "Client not found" });
+
+    const schedule = client.installmentSchedule || [];
+    if (schedule.length === 0) {
+        return res.status(400).json({ success: false, message: "No schedule exists" });
+    }
+
+    const maxId = Math.max(...schedule.map(s => s.id), 0);
+    const normalRows = schedule.filter(s => !s.isPossession);
+    let lastDate = new Date();
+    
+    if (normalRows.length > 0) {
+      const lastRow = normalRows[normalRows.length - 1];
+      if (lastRow.monthDate) {
+         lastDate = new Date(lastRow.monthDate);
+      }
+    }
+    
+    lastDate.setMonth(lastDate.getMonth() + 1);
+
+    const newRow = {
+      id: maxId + 1,
+      monthDate: lastDate.toISOString(),
+      downPayment: 0,
+      installment: parseFloat(client.perMonthInstallment) || 0,
+      surcharges: 0,
+      adjustment: 0,
+      transactionRef: "",
+      paidDate: "",
+      payment: 0,
+      remarks: ""
+    };
+
+    const possessionIndex = schedule.findIndex(s => s.isPossession);
+    if (possessionIndex !== -1) {
+       schedule.splice(possessionIndex, 0, newRow);
+       if (schedule[possessionIndex + 1].monthDate) {
+         const pDate = new Date(schedule[possessionIndex + 1].monthDate);
+         pDate.setMonth(pDate.getMonth() + 1);
+         schedule[possessionIndex + 1].monthDate = pDate.toISOString();
+       }
+    } else {
+       schedule.push(newRow);
+    }
+
+    client.set("installmentSchedule", schedule);
+    client.changed("installmentSchedule", true);
+    await client.save();
+
+    res.json({ success: true, data: client });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

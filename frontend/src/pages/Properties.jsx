@@ -211,7 +211,7 @@ const Properties = () => {
   const uniqueFloors = [...new Set(properties.map(p => p.floor).filter(Boolean))];
 
   /* Stats */
-  const totalValue    = properties.reduce((s, p) => s + (Number(p.price) || 0), 0);
+  const totalValue    = filtered.reduce((s, p) => s + (Number(p.price) || 0), 0);
   const availableCount = properties.filter(p => p.status === 'available').length;
 
   /* Helpers */
@@ -280,7 +280,7 @@ const Properties = () => {
           </div>
           <h1 className="text-3xl font-black text-ink-primary tracking-tight">Properties</h1>
           <p className="text-sm text-ink-secondary mt-0.5">
-            {properties.length} listings · Rs. {(totalValue / 1e6).toFixed(1)}M total value
+            {filtered.length} listings · Rs. {totalValue.toLocaleString()} total value
           </p>
         </div>
 
@@ -372,7 +372,7 @@ const Properties = () => {
           { id: 'all',       label: 'Total Listings', value: properties.length, accent: '#7986cb' },
           { id: 'available', label: 'Available',      value: availableCount,    accent: '#10b981' },
           { id: 'sold',      label: 'Sold',           value: properties.filter(p=>p.status==='sold').length,   accent: '#f87171' },
-          { id: null,        label: 'Portfolio Value',value: `Rs. ${(totalValue/1e6).toFixed(1)}M`, accent: '#fbbf24' },
+          { id: null,        label: 'Portfolio Value',value: `Rs. ${totalValue.toLocaleString()}`, accent: '#fbbf24' },
         ].map((s, i) => {
           const isInteractive = s.id !== null;
           const isActive = filterStatus === s.id;

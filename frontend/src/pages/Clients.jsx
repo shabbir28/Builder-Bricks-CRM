@@ -2,18 +2,20 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   UserGroupIcon, MagnifyingGlassIcon, PlusIcon,
-  PhoneIcon, EnvelopeIcon, MapPinIcon, TrashIcon, ExclamationTriangleIcon
+  PhoneIcon, EnvelopeIcon, MapPinIcon, TrashIcon, ExclamationTriangleIcon, ArrowUpTrayIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import AddClientModal from '../components/modals/AddClientModal';
 import ClientDetailsModal from '../components/modals/ClientDetailsModal';
 import EditClientModal from '../components/modals/EditClientModal';
+import ImportClientModal from '../components/modals/ImportClientModal';
 
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -77,14 +79,24 @@ const Clients = () => {
             Manage buyers and their property portfolios
           </p>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
-          style={{ background: '#10b981', border: '1px solid #059669' }}
-        >
-          <PlusIcon className="w-4 h-4" />
-          Add Client
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg text-emerald-400"
+            style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}
+          >
+            <ArrowUpTrayIcon className="w-4 h-4" />
+            Import Excel
+          </button>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+            style={{ background: '#10b981', border: '1px solid #059669' }}
+          >
+            <PlusIcon className="w-4 h-4" />
+            Add Client
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -114,7 +126,22 @@ const Clients = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {filtered.map(c => {
-            const purchased = c.purchasedProperties || [];
+            let purchased = c.purchasedProperties || [];
+            
+            // If no properties linked but client has a unitNo, show a virtual property
+            if (purchased.length === 0 && c.unitNo) {
+              const dpAmount = parseFloat(String(c.downPayment || 0).replace(/[^0-9.]/g, '')) || 0;
+              const netAmount = parseFloat(String(c.netPrice || c.totalPrice || 0).replace(/[^0-9.]/g, '')) || 0;
+              purchased = [{
+                id: `virtual-${c.id}`,
+                title: `Unit: ${c.unitNo}`,
+                projectName: 'Property Details',
+                type: c.type || 'property',
+                clientPaidAmount: dpAmount,
+                price: netAmount
+              }];
+            }
+
             const totalPaid = purchased.reduce((sum, p) => sum + (p.clientPaidAmount || 0), 0);
             const totalValue = purchased.reduce((sum, p) => sum + (p.price || 0), 0);
 
@@ -245,6 +272,14 @@ const Clients = () => {
         }}
         initialData={selectedClient}
         onClientUpdated={() => {
+          fetchClients();
+        }}
+      />
+
+      <ImportClientModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={() => {
           fetchClients();
         }}
       />

@@ -26,6 +26,7 @@ const communicationRoutes = require("./routes/communicationRoutes");
 const taskRoutes = require("./routes/tasks");
 const visitRoutes = require("./routes/visits");
 const clientRoutes = require("./routes/clients");
+const clientImportRoutes = require("./routes/clientImportRoutes");
 const installmentRequestRoutes = require("./routes/installmentRequests");
 const receiptsRoutes = require("./routes/receipts");
 
@@ -68,6 +69,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/communications", communicationRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/visits", visitRoutes);
+app.use("/api/clients/import", clientImportRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/installment-requests", installmentRequestRoutes);
 app.use("/api/receipts", receiptsRoutes);

@@ -20,7 +20,7 @@ router.get("/", adminAuth, async (req, res) => {
         {
           model: Client,
           as: "client",
-          attributes: ["id", "name", "unitNo", "bookingReferenceNo"],
+          attributes: ["id", "name", "unitNo", "bookingReferenceNo", "phone", "mobileNo"],
         },
         {
           model: User,
@@ -63,7 +63,7 @@ router.get("/my-requests", async (req, res) => {
         {
           model: Client,
           as: "client",
-          attributes: ["id", "name", "unitNo"],
+          attributes: ["id", "name", "unitNo", "phone", "mobileNo"],
         },
       ],
       order: [["createdAt", "DESC"]],

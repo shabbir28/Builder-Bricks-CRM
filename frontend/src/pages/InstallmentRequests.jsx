@@ -9,6 +9,8 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import WhatsAppModal, { WhatsAppIcon } from '../components/modals/WhatsAppModal';
+import { generateInstallmentReceiptMessage, getClientPhone, OFFICIAL_SENDER_NUMBER, openWhatsApp } from '../utils/whatsapp';
 
 const StatusBadge = ({ status }) => {
   const cfg = {
@@ -53,6 +55,7 @@ const InstallmentRequests = () => {
   const [filter, setFilter] = useState('pending');
   const [reviewNote, setReviewNote] = useState({});
   const [processing, setProcessing] = useState(null);
+  const [whatsAppModalData, setWhatsAppModalData] = useState(null);
   const { isAdmin } = useAuth();
 
   // Guard: only admin/super_admin
@@ -75,9 +78,31 @@ const InstallmentRequests = () => {
   const handleApprove = async (id) => {
     try {
       setProcessing(id + '_approve');
+      const reqToApprove = requests.find(r => r.id === id);
       await axios.put(`/api/installment-requests/${id}/approve`, { reviewNote: reviewNote[id] || '' });
       toast.success('✅ Request approved! Installment updated.');
       fetchRequests();
+
+      if (reqToApprove && reqToApprove.changes?.payment && parseFloat(reqToApprove.changes.payment) > 0) {
+        const chng = reqToApprove.changes;
+        const autoPhone = getClientPhone(reqToApprove.client);
+        const msg = generateInstallmentReceiptMessage({
+          clientName: reqToApprove.client?.name,
+          unitNo: reqToApprove.client?.unitNo,
+          type: reqToApprove.client?.type,
+          amount: parseFloat(chng.payment) || 0,
+          remainingInstallmentsAmount: 0,
+          remainingBalance: 0
+        });
+        setWhatsAppModalData({
+          client: reqToApprove.client,
+          message: msg,
+          phone: autoPhone
+        });
+        if (autoPhone) {
+          openWhatsApp(autoPhone, msg);
+        }
+      }
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to approve');
     } finally {
@@ -280,6 +305,31 @@ const InstallmentRequests = () => {
                             "{req.reviewNote}"
                           </div>
                         )}
+                        {req.status === 'approved' && parseFloat(chng.payment || 0) > 0 && (
+                          <button
+                            onClick={() => {
+                              const autoPhone = getClientPhone(req.client);
+                              const msg = generateInstallmentReceiptMessage({
+                                clientName: req.client?.name,
+                                unitNo: req.client?.unitNo,
+                                type: req.client?.type,
+                                amount: parseFloat(chng.payment || 0),
+                                remainingInstallmentsAmount: 0,
+                                remainingBalance: 0
+                              });
+                              setWhatsAppModalData({
+                                client: req.client,
+                                message: msg,
+                                phone: autoPhone
+                              });
+                            }}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/20 transition-all"
+                            title={`Send WhatsApp Receipt (from ${OFFICIAL_SENDER_NUMBER})`}
+                          >
+                            <WhatsAppIcon className="w-3.5 h-3.5" />
+                            Send WhatsApp Receipt
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -289,6 +339,15 @@ const InstallmentRequests = () => {
           })}
         </div>
       )}
+
+      {/* WhatsApp Modal */}
+      <WhatsAppModal
+        isOpen={!!whatsAppModalData}
+        onClose={() => setWhatsAppModalData(null)}
+        client={whatsAppModalData?.client}
+        initialMessage={whatsAppModalData?.message}
+        phone={whatsAppModalData?.phone}
+      />
     </div>
   );
 };

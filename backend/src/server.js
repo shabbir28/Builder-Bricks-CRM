@@ -29,6 +29,8 @@ const clientRoutes = require("./routes/clients");
 const clientImportRoutes = require("./routes/clientImportRoutes");
 const installmentRequestRoutes = require("./routes/installmentRequests");
 const receiptsRoutes = require("./routes/receipts");
+const whatsappRoutes = require("./routes/whatsappRoutes");
+const whatsappService = require("./services/whatsappService");
 
 const app = express();
 
@@ -73,6 +75,7 @@ app.use("/api/clients/import", clientImportRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/installment-requests", installmentRequestRoutes);
 app.use("/api/receipts", receiptsRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
@@ -101,6 +104,8 @@ sequelize
     app.listen(PORT, () => {
       console.log(`📡 SERVER: Running on http://localhost:${PORT}`);
       console.log("-----------------------------------------");
+      // Initialize background WhatsApp service
+      whatsappService.initWhatsApp();
     });
   })
   .catch((error) => {

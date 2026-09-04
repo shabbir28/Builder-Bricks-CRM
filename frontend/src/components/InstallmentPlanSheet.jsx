@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { PencilSquareIcon, CheckIcon, XMarkIcon, DocumentArrowDownIcon, ClockIcon, PaperAirplaneIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useAuth } from '../hooks/useAuth';
+import WhatsAppModal, { WhatsAppIcon } from './modals/WhatsAppModal';
+import WhatsAppConnectModal from './modals/WhatsAppConnectModal';
+import { generateInstallmentReceiptMessage, getClientPhone, OFFICIAL_SENDER_NUMBER, openWhatsApp } from '../utils/whatsapp';
 
 const formatNum = (num) => {
   if (num === null || num === undefined || isNaN(num) || num === 0 || num === '0') return '-';
@@ -14,7 +17,18 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [loading, setLoading] = useState(false);
+  const [whatsAppModalData, setWhatsAppModalData] = useState(null);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [waConnected, setWaConnected] = useState(false);
   const { canDirectEditInstallments, isExecutive } = useAuth();
+
+  useEffect(() => {
+    axios.get('/api/whatsapp/status').then(res => {
+      if (res.data.success) {
+        setWaConnected(res.data.isConnected);
+      }
+    }).catch(() => {});
+  }, []);
 
   const canDirectEdit = canDirectEditInstallments();
   const executive = isExecutive();
@@ -29,9 +43,13 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
       surcharges: row.surcharges || '',
       adjustment: row.adjustment || '',
       transactionRef: row.transactionRef || '',
-      paidDate: row.paidDate ? new Date(row.paidDate).toISOString().split('T')[0] : '',
+      paidDate: row.paidDate ? new Date(row.paidDate).toISOString().split('T')[0] : (new Date().toISOString().split('T')[0]),
       payment: row.payment || '',
-      remarks: row.remarks || ''
+      remarks: row.remarks || '',
+      sendWhatsApp: true,
+      rowMonthDate: row.monthDate,
+      isPossession: row.isPossession,
+      originalPayment: row.payment || 0
     });
   };
 
@@ -40,9 +58,57 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
     setEditForm({});
   };
 
+  const handleOpenWhatsAppForRow = async (row) => {
+    const clientTotalPrice = parseFloat(String(client.netPrice || client.totalPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    const clientTotalPaid = schedule.reduce((sum, s) => sum + (parseFloat(s.payment) || 0), 0);
+    const remaining = Math.max(0, clientTotalPrice - clientTotalPaid);
+
+    // Sum remaining unpaid installments (excluding possession)
+    const remainingInstallmentsAmount = schedule.reduce((sum, s) => {
+      if (s.isPossession) return sum;
+      const due = parseFloat(s.installment) || 0;
+      const paid = parseFloat(s.payment) || 0;
+      return sum + Math.max(0, due - paid);
+    }, 0);
+
+    const autoPhone = getClientPhone(client);
+
+    const receiptText = generateInstallmentReceiptMessage({
+      clientName: client.name,
+      unitNo: client.unitNo,
+      type: client.type,
+      amount: parseFloat(row.payment) || 0,
+      remainingInstallmentsAmount,
+      remainingBalance: remaining
+    });
+
+    // Try sending directly in background without opening any app
+    try {
+      const waRes = await axios.post('/api/whatsapp/send', {
+        phone: autoPhone,
+        message: receiptText
+      });
+      if (waRes.data.success) {
+        toast.success(`🚀 WhatsApp message sent directly to ${autoPhone} in background!`, { duration: 5000 });
+        setWaConnected(true);
+        return;
+      }
+    } catch (err) {
+      console.log('Background WhatsApp direct send failed:', err.response?.data?.message);
+      // Not linked yet -> show QR connect modal
+      setIsConnectModalOpen(true);
+      setWhatsAppModalData({
+        client,
+        message: receiptText,
+        phone: autoPhone
+      });
+    }
+  };
+
   const handleSave = async (installmentId) => {
     try {
       setLoading(true);
+      const paymentAmount = parseFloat(editForm.payment) || 0;
       const res = await axios.put(`/api/clients/${client.id}/installments/${installmentId}`, {
         downPayment: editForm.downPayment || 0,
         installment: editForm.installment || 0,
@@ -50,11 +116,13 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
         adjustment: editForm.adjustment || 0,
         transactionRef: editForm.transactionRef,
         paidDate: editForm.paidDate,
-        payment: editForm.payment || 0,
+        payment: paymentAmount,
         remarks: editForm.remarks || ''
       });
 
       if (res.data.success) {
+        const willSendWhatsApp = editForm.sendWhatsApp !== false && paymentAmount > 0;
+
         if (res.data.requestPending) {
           // Executive — request submitted
           toast.success('✅ Request submitted! Admin will review your changes.', { duration: 5000 });
@@ -64,6 +132,56 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
           toast.success('Installment updated successfully');
           setEditingId(null);
           if (onUpdate) onUpdate(res.data.data);
+        }
+
+        // Trigger WhatsApp direct background send if checked and payment was entered
+        if (willSendWhatsApp) {
+          const clientTotalPrice = parseFloat(String(client.netPrice || client.totalPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+          const currentTotalPaid = schedule.reduce((sum, s) => {
+            if (s.id === installmentId) return sum + paymentAmount;
+            return sum + (parseFloat(s.payment) || 0);
+          }, 0);
+          const remaining = Math.max(0, clientTotalPrice - currentTotalPaid);
+
+          // Calculate remaining unpaid installments amount (excluding possession)
+          const remainingInstallmentsAmount = schedule.reduce((sum, s) => {
+            if (s.isPossession) return sum;
+            const due = parseFloat(s.installment) || 0;
+            const paid = s.id === installmentId ? paymentAmount : (parseFloat(s.payment) || 0);
+            return sum + Math.max(0, due - paid);
+          }, 0);
+
+          const autoPhone = getClientPhone(client);
+
+          const receiptText = generateInstallmentReceiptMessage({
+            clientName: client.name,
+            unitNo: client.unitNo,
+            type: client.type,
+            amount: paymentAmount,
+            remainingInstallmentsAmount,
+            remainingBalance: remaining
+          });
+
+          // Send directly in background without opening any app!
+          try {
+            const waRes = await axios.post('/api/whatsapp/send', {
+              phone: autoPhone,
+              message: receiptText
+            });
+            if (waRes.data.success) {
+              toast.success(`🚀 WhatsApp receipt sent directly to ${autoPhone} in background!`, { duration: 5000 });
+              setWaConnected(true);
+            }
+          } catch (waErr) {
+            console.log('Background WhatsApp not connected:', waErr.response?.data?.message);
+            // Open connect modal with QR code so user can scan once
+            setIsConnectModalOpen(true);
+            setWhatsAppModalData({
+              client,
+              message: receiptText,
+              phone: autoPhone
+            });
+          }
         }
       }
     } catch (e) {
@@ -136,10 +254,26 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
       {/* Header Area */}
       <div className="px-8 py-6 border-b border-surface-border/50 flex items-center justify-between bg-surface-base/50 relative z-10">
         <div>
-          <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
-            <DocumentArrowDownIcon className="w-5 h-5 text-emerald-400" />
-            Installment Ledger
-          </h3>
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+              <DocumentArrowDownIcon className="w-5 h-5 text-emerald-400" />
+              Installment Ledger
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsConnectModalOpen(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black transition-all cursor-pointer ${
+                waConnected 
+                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/20' 
+                  : 'text-amber-400 bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20'
+              }`}
+              title={waConnected ? "WhatsApp Linked: Direct background sending active" : "Click to link WhatsApp for direct background sending"}
+            >
+              <span className={`w-2 h-2 rounded-full ${waConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+              <WhatsAppIcon className="w-3.5 h-3.5" />
+              {waConnected ? `WhatsApp Active (${OFFICIAL_SENDER_NUMBER})` : `Link WhatsApp (${OFFICIAL_SENDER_NUMBER})`}
+            </button>
+          </div>
           <p className="text-xs font-medium text-ink-secondary mt-1">
             {canDirectEdit
               ? 'Manage and track client payments, surcharges, and adjustments.'
@@ -292,25 +426,40 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
 
                   <td className="py-2.5 px-3 text-center bg-[#0a0f18]/90 group-hover:bg-[#131b28]/90 backdrop-blur-sm border-l border-surface-border/50 transition-colors">
                     {isEditing ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleSave(row.id)}
-                          disabled={loading}
-                          className="flex items-center gap-1.5 px-3 h-8 rounded-xl font-bold text-white shadow-lg transition-all text-[12px]"
-                          style={{
-                            background: executive ? '#f97316' : '#10b981',
-                            boxShadow: executive ? '0 4px 12px rgba(249,115,22,0.3)' : '0 4px 12px rgba(16,185,129,0.3)',
-                          }}
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleSave(row.id)}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 px-3 h-8 rounded-xl font-bold text-white shadow-lg transition-all text-[12px]"
+                            style={{
+                              background: executive ? '#f97316' : '#10b981',
+                              boxShadow: executive ? '0 4px 12px rgba(249,115,22,0.3)' : '0 4px 12px rgba(16,185,129,0.3)',
+                            }}
+                          >
+                            {executive ? (
+                              <><PaperAirplaneIcon className="w-3.5 h-3.5" /> Send</>
+                            ) : (
+                              <><CheckIcon className="w-4 h-4" /> Save</>
+                            )}
+                          </button>
+                          <button onClick={handleCancel} disabled={loading} className="w-8 h-8 flex items-center justify-center rounded-xl bg-surface-raised hover:bg-red-500/20 text-ink-secondary hover:text-red-400 transition-all">
+                            <XMarkIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <label 
+                          className="flex items-center gap-1 cursor-pointer text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-lg hover:bg-emerald-500/20 transition-all select-none"
+                          title={`Send WhatsApp confirmation to client from ${OFFICIAL_SENDER_NUMBER}`}
                         >
-                          {executive ? (
-                            <><PaperAirplaneIcon className="w-3.5 h-3.5" /> Send</>
-                          ) : (
-                            <><CheckIcon className="w-4 h-4" /> Save</>
-                          )}
-                        </button>
-                        <button onClick={handleCancel} disabled={loading} className="w-8 h-8 flex items-center justify-center rounded-xl bg-surface-raised hover:bg-red-500/20 text-ink-secondary hover:text-red-400 transition-all">
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
+                          <input
+                            type="checkbox"
+                            checked={editForm.sendWhatsApp !== false}
+                            onChange={e => setEditForm({...editForm, sendWhatsApp: e.target.checked})}
+                            className="rounded text-emerald-500 focus:ring-0 bg-[#0f1520] border-emerald-500/40 w-3 h-3 cursor-pointer"
+                          />
+                          <WhatsAppIcon className="w-3 h-3 text-emerald-400" />
+                          <span>WhatsApp</span>
+                        </label>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 justify-center">
@@ -326,6 +475,22 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
                           <PencilSquareIcon className="w-3.5 h-3.5" />
                           {executive ? 'Req' : 'Edit'}
                         </button>
+
+                        {parseFloat(row.payment) > 0 && (
+                          <button
+                            onClick={() => handleOpenWhatsAppForRow(row)}
+                            className="flex items-center gap-1 px-2 h-7 rounded-lg text-[10px] font-bold transition-all shadow-sm"
+                            style={{
+                              background: 'rgba(16,185,129,0.15)',
+                              border: '1px solid rgba(16,185,129,0.3)',
+                              color: '#34d399'
+                            }}
+                            title={`Send WhatsApp Payment Receipt (from ${OFFICIAL_SENDER_NUMBER})`}
+                          >
+                            <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-400" />
+                            WhatsApp
+                          </button>
+                        )}
 
                         {row.receiptUrl ? (
                           <a
@@ -429,6 +594,26 @@ const InstallmentPlanSheet = ({ client, onUpdate }) => {
           )}
         </table>
       </div>
+
+      {/* WhatsApp Preview & Send Modal */}
+      <WhatsAppModal
+        isOpen={!!whatsAppModalData}
+        onClose={() => setWhatsAppModalData(null)}
+        client={whatsAppModalData?.client}
+        initialMessage={whatsAppModalData?.message}
+        phone={whatsAppModalData?.phone}
+      />
+
+      {/* WhatsApp QR & Pairing Connect Modal for Background Direct Sending */}
+      <WhatsAppConnectModal
+        isOpen={isConnectModalOpen}
+        onClose={() => setIsConnectModalOpen(false)}
+        pendingData={whatsAppModalData}
+        onConnected={() => {
+          setWaConnected(true);
+          toast.success('WhatsApp connected! All messages will now send directly in background.');
+        }}
+      />
     </div>
   );
 };
